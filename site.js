@@ -415,3 +415,33 @@
     apply();
   })();
 })();
+
+/* עבודות: סינון (?cat=) ותצוגה מוגדלת עם וואטסאפ על העבודה */
+(function () {
+  var d = document, grid = d.getElementById('pj-grid');
+  if (!grid) return;
+  var items = [].slice.call(grid.children), btns = [].slice.call(d.querySelectorAll('.fl')), live = d.getElementById('pj-live');
+  function setF(f, push) {
+    if (!btns.some(function (b) { return b.dataset.f === f; })) f = 'all';
+    var n = 0;
+    items.forEach(function (li) { var on = f === 'all' || li.dataset.c === f; li.hidden = !on; if (on) n++; });
+    btns.forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.f === f ? 'true' : 'false'); });
+    if (live && push) live.textContent = 'מוצגות ' + n + ' עבודות';
+    if (push) history.replaceState(null, '', f === 'all' ? location.pathname : '?cat=' + f);
+  }
+  btns.forEach(function (b) { b.addEventListener('click', function () { setF(b.dataset.f, true); }); });
+  setF(new URLSearchParams(location.search).get('cat') || 'all', false);
+  var lb = d.getElementById('lb');
+  if (!lb || !lb.showModal) return;
+  var img = lb.querySelector('img'), cap = lb.querySelector('.lb-c'), wa = lb.querySelector('.lb-wa'), from;
+  grid.addEventListener('click', function (e) {
+    var b = e.target.closest('.pj-b'); if (!b) return;
+    var im = b.querySelector('img'), name = b.parentNode.querySelector('.pj-c').textContent;
+    from = b; img.src = b.dataset.full; img.alt = im.alt; cap.textContent = name;
+    wa.href = 'https://wa.me/972502222155?text=' + encodeURIComponent('היי שלום, ראיתי באתר את העבודה ל' + name + ' ואשמח למשהו דומה. מצרף צילום של הקיר.');
+    lb.showModal();
+  });
+  lb.querySelector('.lb-x').addEventListener('click', function () { lb.close(); });
+  lb.addEventListener('click', function (e) { if (e.target === lb) lb.close(); });
+  lb.addEventListener('close', function () { if (from) from.focus(); });
+})();
