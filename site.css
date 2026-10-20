@@ -16,7 +16,6 @@
   --surface: rgba(236,234,228,.055); --surface-hi: rgba(236,234,228,.10); --sink: rgba(1,8,16,.35);
   --cream: #E8DFCB; --cream-hi: #F3ECDC; --on-cream: #061A2C;
   --cyan: #4CCBF5; --cyan-2: #1AA3DA;
-  --paper: #F3F1EC; --blue-ink: #0E6E9C;
   --r-1: 4px; --r-2: 6px;
   --gut: clamp(24px, 5vw, 96px); --col-gap: clamp(16px, 2vw, 32px);
   --sec: clamp(96px, 10vw, 176px); --frame: 1440px;
@@ -55,14 +54,11 @@ main:focus { outline: none; }
 
 .frame { width: 100%; max-width: calc(var(--frame) + 2 * var(--gut)); margin-inline: auto; padding-inline: var(--gut); }
 .sec { padding-block: var(--sec); position: relative; }
-/* סקשנים בהירים: נייר חם והדיו כחול כהה. הפעולה בהם בנייבי, הקרם נשאר לכהים */
-.is-light { --ink: #0B1F33; --ink-soft: rgba(11,31,51,.8); --muted: #56636F; --surface: rgba(11,31,51,.05); --surface-hi: rgba(11,31,51,.09);
-  background: var(--paper); color: var(--ink); color-scheme: light; }
-.is-gray { --paper: #EEF1F4; }
-.is-light .btn-cream { background: var(--bg); color: #F3F1EC; }
-.is-light .link-arrow .ar, .is-light .num { color: var(--blue-ink); }
-.is-light :focus-visible { outline-color: var(--bg); }
-@media (hover: hover) and (pointer: fine) { .is-light .btn-cream:hover { background: var(--bg-2); } }
+/* פאנל לבן על הרקע הכהה (שלום): הדיו בו כחול כהה והפעולה בנייבי. רקע העמוד אחד לכל האורך */
+.fd-panel { --ink: #0B1F33; --ink-soft: rgba(11,31,51,.8); --muted: #56636F; color: var(--ink); color-scheme: light; }
+.fd-panel .btn-cream { background: var(--bg); color: #F3F1EC; }
+.fd-panel :focus-visible { outline-color: var(--bg); }
+@media (hover: hover) and (pointer: fine) { .fd-panel .btn-cream:hover { background: var(--bg-2); } }
 
 /* טיפוגרפיה: גולן רק ב-h1, h2 ובמספרים */
 .h2 { font-family: var(--font-d); font-weight: 600; font-size: var(--fs-h2); line-height: 1.06; letter-spacing: -.005em; text-wrap: balance; }
@@ -378,9 +374,7 @@ html.qa .hero-glow, html.a11y-nomotion .hero-glow { animation: none; opacity: 1;
   .ty a:hover .ty-go { transform: translateX(-4px); background: var(--cream); }
 }
 
-/* ===== מה מיוחד: קרקע כחולה של המותג עם זוהר תכלת, וסרטון של ייצור ===== */
-.why { --muted: #C9D6E2; --ink-soft: rgba(243,241,236,.9); isolation: isolate;
-  background: radial-gradient(56% 70% at 22% 45%, rgba(76,203,245,.26) 0%, rgba(76,203,245,0) 70%), linear-gradient(165deg, #0D4B74 0%, #093657 100%); }
+/* ===== מה מיוחד: על הרקע של העמוד, וסרטון של ייצור ===== */
 .why-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--col-gap); align-items: center; }
 .why-copy { grid-column: 1 / span 6; grid-row: 1; display: grid; justify-items: start; }
 .why-copy .sec-head { margin-block-end: clamp(32px, 3.6vw, 56px); }
@@ -461,7 +455,7 @@ html:not(.js) .pc-step { grid-area: auto; }
   .pc-lb:hover { color: var(--ink); }
 }
 
-/* ===== ביקורות מגוגל: הכרטיס של גוגל, לבן על אפור. הצבעים של גוגל רק כאן ===== */
+/* ===== ביקורות מגוגל: הכרטיס של גוגל, לבן על הרקע הכהה. הצבעים של גוגל רק כאן ===== */
 .reviews { padding-block-end: calc(var(--sec) * .5); }
 .gr-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 1.4vw, 20px); }
 .gr { display: grid; gap: 14px; align-content: start; padding: clamp(20px, 2vw, 32px); border-radius: 12px; background: #fff; color: #202124; transition-delay: calc(var(--k) * 90ms); }
@@ -572,7 +566,7 @@ html:not(.js) .pc-step { grid-area: auto; }
 }
 
 /* ===== נגישות ===== */
-.a11y-btn { position: fixed; inset-inline-end: 0; inset-block-end: 96px; z-index: 90; width: 30px; height: 52px; border-radius: var(--r-2) 0 0 var(--r-2); background: var(--cream); color: var(--on-cream); display: grid; place-items: center; box-shadow: inset 0 0 0 1.5px rgba(6,26,44,.5); }
+.a11y-btn { position: fixed; inset-inline-end: 0; inset-block-end: 96px; z-index: 90; width: 30px; height: 52px; border-radius: var(--r-2) 0 0 var(--r-2); background: var(--cream); color: var(--on-cream); display: grid; place-items: center; }
 html[dir="rtl"] .a11y-btn { border-radius: 0 var(--r-2) var(--r-2) 0; }
 .a11y-btn svg { width: 20px; height: 20px; }
 .a11y-panel { position: fixed; inset-inline-end: 16px; inset-block-end: 160px; z-index: 121; width: min(92vw, 340px); max-height: min(70vh, 560px); background: #0C2A47; color: var(--ink);
