@@ -1,4 +1,4 @@
-/* פלומבה v14 · הדר hd9, שלט תלת ממד (h5), זרקור על הלקוחות (g138), נסו על השם שלכם, נגישות */
+/* פלומבה v15 · הדר hd9, שלט תלת ממד (h5), אנטומיה (g90), עבודות נחשפות, עיגול התהליך (g22), נגישות */
 (function () {
   'use strict';
   var d = document, w = window, html = d.documentElement;
@@ -8,7 +8,7 @@
   var mqRM = w.matchMedia('(prefers-reduced-motion: reduce)');
   var FINE = w.matchMedia('(hover: hover) and (pointer: fine)').matches;
   var still = function () { return QA || mqRM.matches || html.classList.contains('a11y-nomotion'); };
-  var WA = function (t) { return 'https://wa.me/972502222155?text=' + encodeURIComponent(t || 'היי שלום, אשמח להדמיה לשלט.'); };
+  var WA = function (t) { return 'https://wa.me/972502222155?text=' + encodeURIComponent(t || 'היי שלום, אשמח לייעוץ על שלט לארגון שלנו.'); };
   var clamp = function (v, a, b) { return Math.max(a, Math.min(b, v)); };
 
   /* ---------- וואטסאפ עם טקסט ---------- */
@@ -37,6 +37,22 @@
   }
   w.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(onScroll); } }, { passive: true });
   onScroll();
+
+  /* ---------- עוגנים בעמוד: גלישה רכה עד מתחת להדר, ובהפחתת תנועה קפיצה ---------- */
+  // GSAP מכבה את הגלילה הרכה של ה-CSS (היא מתנגשת בסצנות), אז הקישורים גולשים כאן
+  d.addEventListener('click', function (e) {
+    var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || a.hasAttribute('data-open-dlg')) return;
+    var id = a.getAttribute('href').slice(1), t = null;
+    try { t = id && d.getElementById(decodeURIComponent(id)); } catch (err) {}
+    if (!t) return;
+    e.preventDefault();
+    var top = t.getBoundingClientRect().top + w.scrollY - (hd ? hd.offsetHeight : 0);
+    w.scrollTo({ top: Math.max(0, Math.round(top)), behavior: still() ? 'auto' : 'smooth' });
+    try { history.pushState(null, '', '#' + id); } catch (err) {}
+    if (!t.hasAttribute('tabindex')) t.setAttribute('tabindex', '-1');
+    t.focus({ preventScroll: true });
+  });
   // אם הפוקוס נכנס להדר המוסתר, הוא חוזר
   hd.addEventListener('focusin', function () { hd.classList.remove('is-hidden'); });
 
@@ -115,6 +131,48 @@
     hero.addEventListener('pointerleave', function () { tx = 0; ty = 0; if (!raf) raf = requestAnimationFrame(tick); });
   }
 
+  /* ---------- MV:g22 · העיגול של התהליך: הקשת נמשכת, ובכל רבע שלב אחד ---------- */
+  // בדסקטופ הגלילה מניעה אותו (נעוץ). בכל מסך לחיצה על נקודה או על השם שלה עוברת לשלב
+  var circle = (function () {
+    var pc = d.querySelector('[data-circle]'); if (!pc) return null;
+    var C = 1822.12, arc = pc.querySelector('.pc-arc'), num = d.getElementById('pc-n');
+    var sts = [].slice.call(pc.querySelectorAll('.pc-st')), lbs = [].slice.call(pc.querySelectorAll('.pc-lb')), steps = [].slice.call(pc.querySelectorAll('.pc-step'));
+    var api = { el: pc, st: null, on: 0 };
+    api.draw = function (p) { arc.style.strokeDashoffset = (C * (1 - clamp(p, 0, 1))).toFixed(2); };
+    api.set = function (i) {
+      if (i === api.on) return; api.on = i;
+      sts.forEach(function (b, k) { b.classList.toggle('is-done', k < i); if (k === i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
+      lbs.forEach(function (l, k) { l.classList.toggle('is-on', k === i); });
+      steps.forEach(function (s, k) { s.classList.toggle('is-on', k === i); });
+      if (num) num.textContent = i + 1;
+    };
+    var go = function (k) {
+      var st = api.st;
+      if (st) w.scrollTo({ top: st.start + (st.end - st.start) * (k / 4 + .125), behavior: still() ? 'auto' : 'smooth' });
+      else { api.set(k); api.draw(k / 4 + .125); }
+    };
+    sts.forEach(function (b, k) { b.addEventListener('click', function () { go(k); }); });
+    lbs.forEach(function (l, k) { l.addEventListener('click', function () { go(k); }); });
+    return api;
+  })();
+
+  /* ---------- סרטון הכרסומת: מתנגן רק כשהוא על המסך, ותמיד אפשר לעצור ---------- */
+  var wv = d.getElementById('why-v'), wp = d.getElementById('why-play');
+  if (wv && wp) {
+    var userPaused = still();
+    var vUi = function () { var p = wv.paused; wp.classList.toggle('is-paused', p); wp.setAttribute('aria-label', p ? 'הפעלת הסרטון' : 'עצירת הסרטון'); };
+    var vPlay = function () { var r = wv.play(); if (r && r.catch) r.catch(function () {}); };
+    wp.hidden = false;
+    wv.addEventListener('play', vUi); wv.addEventListener('pause', vUi);
+    wp.addEventListener('click', function () { if (wv.paused) { userPaused = false; vPlay(); } else { userPaused = true; wv.pause(); } });
+    if ('IntersectionObserver' in w) {
+      new IntersectionObserver(function (es) {
+        if (es[0].isIntersecting) { if (!userPaused && !still()) vPlay(); } else if (!wv.paused) wv.pause();
+      }, { threshold: .25 }).observe(wv);
+    }
+    vUi();
+  }
+
   /* ---------- סצנות גלילה (GSAP) ---------- */
   var scenes = [];
   function motion() {
@@ -123,8 +181,9 @@
     html.classList.add('gsap-live');
     try { history.scrollRestoration = 'manual'; } catch (e) {}
     var mm = gsap.matchMedia();
-    mm.add('(prefers-reduced-motion: no-preference)', function () {
-      if (html.classList.contains('a11y-nomotion')) return;
+    mm.add({ ok: '(prefers-reduced-motion: no-preference)', md: '(min-width: 768px)', lg: '(min-width: 1024px)' }, function (ctx) {
+      var c = ctx.conditions;
+      if (!c.ok || html.classList.contains('a11y-nomotion')) return;
       // ההירו: השלט מסתובב אל הצופה ויורד לאט, הטקסט נסוג
       if (hero && heroRig) {
         var tl = gsap.timeline({ scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: .6 } });
@@ -135,7 +194,7 @@
       }
       // MV:g90 · אנטומיה של אות: השכבות נפרדות מהקיר, ובכל שלב שכבה אחת מוארת
       var an = d.querySelector('[data-anat]');
-      if (an && innerWidth >= 768) {
+      if (an && c.md) {
         var anRig = d.getElementById('an-rig'), anItems = an.querySelectorAll('.an-list li'); an.classList.add('gsap-live');
         var ao = { x: 0, ry: 12, rx: 6 }, aOn = -1;
         var aPut = function () {
@@ -148,51 +207,23 @@
         ta.to(ao, { x: 1, ry: 40, rx: 12, duration: 1, ease: 'power2.inOut' }).to(ao, { ry: 28, duration: 4, ease: 'none' });
         aPut();
       }
-      // MV:g150 · סיור בבניין: מתקרבים לקומה, והבאה נפתחת כמו דלת
-      var tr = d.querySelector('[data-tour]');
-      if (tr && innerWidth >= 768) {
-        var sc = [].slice.call(tr.querySelectorAll('.tr-scene')), dots = tr.querySelectorAll('.tr-dots li'); tr.classList.add('gsap-live');
-        var tt = gsap.timeline({ scrollTrigger: { trigger: tr, start: 'top top', end: 'bottom bottom', scrub: .6 },
-          onUpdate: function () { var i = Math.min(sc.length - 1, Math.round(tt.progress() * (sc.length - 1) - .1)); dots.forEach(function (li, k) { li.classList.toggle('is-on', k === Math.max(0, i)); }); } });
-        sc.forEach(function (s, i) {
-          if (i) { gsap.set(s, { '--ct': '100%', '--cx': '41%', '--cr': '10px' }); gsap.set(s.querySelector('.tr-text > div'), { opacity: 0, y: 40 }); }
-        });
-        tt.to({}, { duration: .3 });
-        sc.forEach(function (s, i) {
-          if (!i) return;
-          var prev = sc[i - 1], at = '+=0';
-          tt.to(prev.querySelector('.tr-text > div'), { opacity: 0, y: -30, duration: .3, ease: 'power1.in' }, at)
-            .to(prev, { '--zm': 1.45, duration: 1, ease: 'power1.in' }, '<')
-            .to(s, { '--ct': '38%', duration: .45, ease: 'power2.out' }, '<.15')
-            .to(s, { '--ct': '0%', '--cx': '0%', '--cr': '0px', duration: .55, ease: 'power2.inOut' })
-            .fromTo(s, { '--zm': 1.18 }, { '--zm': 1, duration: .8, ease: 'power2.out' }, '<')
-            .to(s.querySelector('.tr-text > div'), { opacity: 1, y: 0, duration: .4, ease: 'power2.out' }, '<.3')
-            .set(prev, { visibility: 'hidden' })
-            .to({}, { duration: .3 });
-        });
-        dots[0].classList.add('is-on');
-        // מקלדת: פוקוס על קישור בקומה מוסתרת גולל אליה
-        sc.forEach(function (s, i) {
-          s.addEventListener('focusin', function () {
-            var st = tt.scrollTrigger; if (!st) return;
-            var y = st.start + (st.end - st.start) * (i / (sc.length - 1));
-            if (Math.abs(w.scrollY - y) > 40) w.scrollTo(0, y);
-          });
-        });
+      // עבודות נבחרות: כל אריח נחשף מלמטה ונדלק כשהוא נכנס, והתמונה מתכווצת לגודלה (--on ב-CSS)
+      gsap.utils.toArray('[data-works] .wk').forEach(function (li) {
+        gsap.fromTo(li, { '--on': 0, '--cy': '18%' }, { '--on': 1, '--cy': '0%', ease: 'none', scrollTrigger: { trigger: li, start: 'top 92%', end: 'top 50%', scrub: .6 } });
+      });
+      // העיגול נעוץ, והגלילה מקיפה אותו: כל רבע הוא שלב
+      if (circle && c.lg) {
+        circle.el.classList.add('gsap-live');
+        var co = { p: 0 };
+        var tc = gsap.to(co, { p: 1, ease: 'none', scrollTrigger: { trigger: circle.el, start: 'top top', end: 'bottom bottom', scrub: .4 },
+          onUpdate: function () { circle.draw(co.p); circle.set(Math.min(3, Math.floor(co.p * 4))); } });
+        circle.st = tc.scrollTrigger;
+        circle.draw(0);
       }
-      // MV:g138 · הזרקור נוסע בזיגזג על קיר הלוגואים, ובסוף נפתח על כולו
-      var sl = d.querySelector('[data-spot]');
-      if (sl) {
-        var pin = sl.querySelector('.sl-pin'); sl.classList.add('gsap-live');
-        var phone = innerWidth < 768, o = { x: 86, y: 18, r: phone ? 52 : 22 };
-        var pts = phone ? [{ x: 20, y: 18 }, { x: 80, y: 42 }, { x: 22, y: 64 }, { x: 78, y: 88 }] : [{ x: 40, y: 22 }, { x: 12, y: 52 }, { x: 62, y: 54 }, { x: 88, y: 84 }, { x: 36, y: 86 }];
-        var put = function () { pin.style.setProperty('--sx', o.x + '%'); pin.style.setProperty('--sy', o.y + '%'); pin.style.setProperty('--sr', o.r + 'vw'); };
-        var t2 = gsap.timeline({ scrollTrigger: { trigger: sl, start: 'top top', end: 'bottom bottom', scrub: .6 }, onUpdate: put });
-        pts.forEach(function (p) { t2.to(o, { x: p.x, y: p.y, duration: 1, ease: 'power1.inOut' }); });
-        t2.to(o, { x: 50, y: 52, r: phone ? 140 : 80, duration: 1.2, ease: 'power2.inOut' });
-        put();
-        return function () { d.querySelectorAll('.an, .tr').forEach(function (e) { e.classList.remove('gsap-live'); }); sl.classList.remove('gsap-live'); ['--sx', '--sy', '--sr'].forEach(function (k) { pin.style.removeProperty(k); }); };
-      }
+      return function () {
+        d.querySelectorAll('.an, .pc').forEach(function (e) { e.classList.remove('gsap-live'); });
+        if (circle) { circle.st = null; circle.set(0); circle.draw(.125); }
+      };
     });
     scenes.push(mm);
     w.addEventListener('load', function () { ScrollTrigger.refresh(); });
@@ -203,27 +234,6 @@
   /* ---------- אנטומיה: הדופן היא שכבות של אותה אות ---------- */
   var anSide = d.getElementById('an-side');
   if (anSide) { for (var ai = 0; ai < 16; ai++) { var sp = d.createElement('span'); sp.style.setProperty('--i', ai); sp.style.setProperty('--c', 'hsl(208 14% ' + Math.round(70 - ai * 2.6) + '%)'); anSide.appendChild(sp); } }
-
-  /* ---------- MV:g43 · רשימת עבודות: התמונה עוקבת אחרי הסמן ---------- */
-  var wl = d.querySelector('[data-works]'), wc = d.querySelector('.wk-cursor');
-  if (wl && wc && FINE) {
-    var wimg = wc.querySelector('img'), mx = 0, my = 0, cx2 = 0, cy2 = 0, wraf = 0, won = false;
-    var wtick = function () {
-      var dx = mx - cx2; cx2 += dx * .16; cy2 += (my - cy2) * .16;
-      wc.style.setProperty('--mx', cx2.toFixed(1) + 'px'); wc.style.setProperty('--my', cy2.toFixed(1) + 'px');
-      wc.style.setProperty('--rot', still() ? '0deg' : clamp(dx * .04, -8, 8).toFixed(2) + 'deg');
-      wraf = (won || Math.abs(mx - cx2) > .5 || Math.abs(my - cy2) > .5) ? requestAnimationFrame(wtick) : 0;
-    };
-    wl.addEventListener('pointermove', function (e) {
-      mx = e.clientX; my = e.clientY;
-      var a = e.target.closest('a'); if (!a) return;
-      if (!won) { cx2 = mx; cy2 = my; won = true; wc.classList.add('is-on'); }
-      if (wimg.getAttribute('src') !== a.getAttribute('data-img')) wimg.src = a.getAttribute('data-img');
-      if (!wraf) wraf = requestAnimationFrame(wtick);
-    });
-    wl.addEventListener('pointerleave', function () { won = false; wc.classList.remove('is-on'); });
-    w.addEventListener('scroll', function () { if (won) { won = false; wc.classList.remove('is-on'); } }, { passive: true });
-  }
 
   /* ---------- נסו על השם שלכם ---------- */
   (function configurator() {
@@ -395,6 +405,7 @@
       html.style.setProperty('--a11y-scale', scale);
       ['contrast', 'invert', 'gray', 'links', 'font', 'spacing', 'nomotion', 'cursor', 'guide'].forEach(function (k) { html.classList.toggle('a11y-' + k, !!state[k]); });
       panel.querySelectorAll('[data-a11y]').forEach(function (b) { var k = b.getAttribute('data-a11y'); if (k in state) b.setAttribute('aria-pressed', state[k] ? 'true' : 'false'); });
+      if (state.nomotion) { var v = d.getElementById('why-v'); if (v && !v.paused) v.pause(); }
       if (state.nomotion && w.ScrollTrigger) { scenes.forEach(function (m) { m.revert(); }); scenes = []; ScrollTrigger.getAll().forEach(function (t) { t.kill(true); }); }
       try { state.scale = scale; localStorage.setItem('plomba-a11y', JSON.stringify(state)); } catch (e) {}
     }
