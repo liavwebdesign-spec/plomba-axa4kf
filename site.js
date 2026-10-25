@@ -188,8 +188,9 @@
       if (hero && heroRig) {
         var tl = gsap.timeline({ scrollTrigger: { trigger: hero, start: 'top top', end: 'bottom top', scrub: .6 } });
         tl.to(heroRig, { '--ry': -4, '--rx': 1, ease: 'none' }, 0)
-          .to('.hero-sign', { yPercent: 22, ease: 'none' }, 0)
-          .to('.hero-copy', { yPercent: -10, opacity: .2, ease: 'none' }, 0)
+          // בטלפון התנועה קצרה יותר: השלט והטקסט נערמים זה על זה, ולכן הם לא נפגשים גם בסוף היציאה
+          .to('.hero-sign', { yPercent: c.md ? 22 : 12, ease: 'none' }, 0)
+          .to('.hero-copy', { yPercent: c.md ? -10 : -5, opacity: .2, ease: 'none' }, 0)
           .to('.hero-glow', { opacity: .55, ease: 'none' }, 0);
       }
       // MV:g90 · אנטומיה של אות: השכבות נפרדות מהקיר, ובכל שלב שכבה אחת מוארת

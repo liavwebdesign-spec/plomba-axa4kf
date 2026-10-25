@@ -79,10 +79,14 @@ html.js .rv.is-in { opacity: 1; transform: none; }
 .btn-cream { background: var(--cream); color: var(--on-cream); }
 .btn-sm { min-height: 44px; padding: 0 20px; font-size: calc(15px * var(--a11y-scale)); }
 .btn-block { width: 100%; }
+/* הפעולה השנייה (וואטסאפ): אותו גודל, בלי להתחרות בחיוג */
+.btn-soft { background: rgba(236,234,228,.1); color: var(--ink); }
+.fd-panel .btn-soft { background: rgba(6,26,44,.08); color: var(--bg); }
 .link-arrow { display: inline-flex; align-items: center; gap: 12px; min-height: 44px; font: 500 var(--fs-btn)/1.2 var(--font-t); color: var(--ink); }
 .link-arrow .ar { color: var(--cream); transition: transform .3s var(--ease); }
 @media (hover: hover) and (pointer: fine) {
   .btn-cream:hover { background: var(--cream-hi); }
+  .btn-soft:hover { background: rgba(236,234,228,.18); }
   .btn:hover svg, .link-arrow:hover .ar { transform: translateX(-4px); }
   .btn svg { transition: transform .3s var(--ease); }
 }
@@ -104,9 +108,11 @@ html.js .rv.is-in { opacity: 1; transform: none; }
 .hd-link[aria-expanded="true"] svg { transform: rotate(180deg); }
 @media (hover: hover) and (pointer: fine) { .hd-link:hover { color: var(--ink); } }
 .hd-end { margin-inline-start: auto; display: flex; align-items: center; gap: clamp(12px, 1.6vw, 24px); }
-.hd-tel { font-size: calc(16px * var(--a11y-scale)); color: var(--ink-soft); direction: ltr; min-height: 44px; display: inline-flex; align-items: center; font-variant-numeric: tabular-nums; }
-.hd-wa, .hd-burger { display: none; width: 44px; height: 44px; border-radius: var(--r-1); place-items: center; background: var(--surface-hi); }
-.hd-wa svg, .hd-burger svg { width: 22px; height: 22px; }
+/* חיוג קודם (כפתור עם המספר), וואטסאפ שני. בטאבלט ובטלפון שניהם אייקונים */
+.hd-ph, .hd-wa, .hd-burger { display: none; width: 44px; height: 44px; border-radius: var(--r-1); place-items: center; background: var(--surface-hi); }
+.hd-wa { display: grid; }
+.hd-ph svg, .hd-wa svg, .hd-burger svg { width: 22px; height: 22px; }
+.hd-end .btn bdi { font-variant-numeric: tabular-nums; }
 
 /* מגה תפריט: שתי קבוצות ותמונה */
 /* מחוץ לזרימה: ההדר נמדד רק לפי הגלולה */
@@ -265,6 +271,7 @@ html.qa .hero-glow, html.a11y-nomotion .hero-glow { animation: none; opacity: 1;
 .cfg-panel output { color: var(--cream); font-variant-numeric: tabular-nums; }
 .field { /* qa-allow: line (קצה של שדה טופס) */ width: 100%; min-height: 54px; padding: 12px 16px; border-radius: var(--r-1); background: var(--sink); border: 1px solid rgba(236,234,228,.22);
   font-size: calc(19px * var(--a11y-scale)); transition: border-color .2s var(--ease); }
+.field[dir="ltr"], .field[type="tel"] { /* qa-allow: physical (מספר טלפון נכתב משמאל לימין, ובאתר עברי מיושר לימין כמו שאר השדות) */ text-align: right; }
 .field::placeholder { color: rgba(236,234,228,.5); }
 .field:focus { outline: none; border-color: var(--cream); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -561,7 +568,7 @@ html:not(.js) .pc-step { grid-area: auto; }
   .lg.tall { width: 54px; height: 44px; }
   .fq summary { padding: 14px 16px; font-size: calc(17px * var(--a11y-scale)); }
   .fq p { padding: 0 16px 18px; }
-  .cl-ctas .btn { width: 100%; }
+  .cl-ctas { align-items: flex-start; }
   .closer { min-height: 78svh; }
 }
 
@@ -598,11 +605,10 @@ html.a11y-nomotion *, html.a11y-nomotion *::before, html.a11y-nomotion *::after 
 /* ===== רוחבים ===== */
 @media (max-width: 1279px) {
   .hd-nav ul { gap: 0; }
-  .hd-tel { display: none; }
 }
 @media (max-width: 1023px) {
   .hd-nav, .hd-end .btn { display: none; }
-  .hd-wa, .hd-burger { display: grid; }
+  .hd-ph, .hd-burger { display: grid; }
   .mega { display: none; }
   .hero-grid { grid-template-columns: 1fr; }
   .hero-copy { grid-column: 1; grid-row: 2; padding-block: 8px 24px; }
@@ -661,6 +667,9 @@ html.a11y-nomotion *, html.a11y-nomotion *::before, html.a11y-nomotion *::after 
 .ph-crumb a { color: var(--ink-soft); }
 .ph-h1 { font-family: var(--font-d); font-weight: 600; font-size: var(--fs-hero); line-height: 1.02; text-wrap: balance; margin-block-end: 24px; max-width: 16ch; }
 .ph .lead { max-width: 52ch; margin-block-end: 40px; }
+.ph .lead:has(+ .ph-p) { margin-block-end: 16px; }
+.ph-p { max-width: 56ch; color: var(--ink-soft); line-height: 1.6; margin-block-end: 16px; }
+.ph-p:has(+ .hero-ctas) { margin-block-end: 40px; }
 .ph-slim .lead { font-size: var(--fs-body); }
 .ph-slim .ph-h1 { max-width: 20ch; }
 @media (hover: hover) and (pointer: fine) { .ph-crumb a:hover { color: var(--ink); } }
@@ -730,4 +739,66 @@ html.a11y-nomotion *, html.a11y-nomotion *::before, html.a11y-nomotion *::after 
   .pj { margin-block-end: 12px; }
   .rg-grid { columns: 1; }
   .lb-bar { flex-wrap: wrap; }
+}
+
+/* ===== עמודי שירות ואודות: כותרת מימין, הטקסט משמאל, כרטיסים בלי קווים ===== */
+.rgal + .sv-secs { padding-block-start: 0; }
+.sv-secs .frame { display: grid; gap: clamp(56px, 6vw, 96px); }
+.sv-row { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--col-gap); align-items: start; }
+.sv-h { grid-column: 1 / span 4; font-family: var(--font-d); font-weight: 600; font-size: calc(clamp(28px, 2.6vw, 44px) * var(--a11y-scale)); line-height: 1.08; text-wrap: balance; }
+.sv-body { grid-column: 6 / span 7; display: grid; gap: 16px; align-content: start; }
+.sv-body > p { color: var(--ink-soft); font-size: var(--fs-body); line-height: 1.7; max-width: 62ch; }
+.sv-list { display: grid; gap: 10px; }
+.sv-list li { padding: 18px 24px; border-radius: var(--r-1); background: var(--surface); color: var(--ink-soft); line-height: 1.6; }
+.sv-list b { color: var(--ink); font-weight: 500; }
+.sv-go { display: flex; flex-wrap: wrap; gap: 0 28px; }
+.sv-list .sv-go { margin-block-start: 4px; }
+.rg-i figcaption b { color: var(--ink); font-weight: 500; margin-inline-end: 6px; }
+.rg-txt { display: grid; gap: 8px; margin-block: -16px 40px; color: var(--ink-soft); max-width: 70ch; }
+.rg-txt b { color: var(--ink); font-weight: 500; }
+.ab-ph { margin-block-start: 12px; max-width: 360px; border-radius: var(--r-2); overflow: hidden; background: #fff; }
+.ab-ph img { width: 100%; height: auto; display: block; }
+.ab-logos { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-block-start: 8px; }
+.ab-logos li { display: grid; place-items: center; min-height: 84px; padding: 16px; border-radius: var(--r-1); background: var(--surface); }
+.ab-logos img { max-width: 100%; max-height: 40px; width: auto; height: auto; }
+.qt-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--col-gap); margin-block-start: 56px; }
+.qt { display: grid; gap: 18px; align-content: space-between; padding: clamp(24px, 2.4vw, 40px); border-radius: var(--r-2); background: var(--surface); margin: 0; }
+.qt blockquote { margin: 0; }
+.qt p { font-size: var(--fs-lead); line-height: 1.5; color: var(--ink); }
+.qt figcaption { font-size: var(--fs-meta); color: var(--muted); }
+
+/* ===== צור קשר ===== */
+.ct { padding-block: 0 calc(var(--sec) * .5); }
+.ct-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--col-gap); row-gap: 40px; align-items: start; }
+.ct-card { grid-column: 1 / span 6; display: grid; gap: 24px; justify-items: start; padding: clamp(28px, 3vw, 48px); border-radius: var(--r-2); background: var(--surface); }
+.ct-k { font-size: var(--fs-meta); color: var(--muted); }
+.ct-big { font-family: var(--font-d); font-weight: 600; font-size: calc(clamp(44px, 5vw, 80px) * var(--a11y-scale)); line-height: 1; color: var(--cream); direction: ltr; margin-block-start: -12px; }
+.ct-dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; width: 100%; margin: 0; }
+.ct-dl div { padding: 14px 16px; border-radius: var(--r-1); background: var(--sink); }
+.ct-dl dt { font-size: var(--fs-meta); color: var(--muted); }
+.ct-dl dd { margin: 4px 0 0; color: var(--ink); overflow-wrap: anywhere; }
+.ct-send { grid-column: 8 / span 5; display: grid; gap: 20px; justify-items: start; }
+.ct-send > * { grid-column: auto; }
+.fm-sec .sec-head { margin-block-end: 40px; }
+.fm-grid > * { max-width: 760px; }
+.fm { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.fm-f { display: grid; gap: 8px; color: var(--ink-soft); font-size: var(--fs-meta); }
+.fm-f small { color: var(--muted); font-size: inherit; }
+.fm-wide { grid-column: 1 / -1; }
+.fm textarea.field { min-height: 132px; resize: vertical; font: inherit; }
+.fm-status { padding: 18px 24px; border-radius: var(--r-1); background: var(--surface); color: var(--ink); line-height: 1.6; }
+.fm-status a { text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 1023px) {
+  .sv-row { grid-template-columns: 1fr; row-gap: 20px; }
+  .sv-h, .sv-body { grid-column: 1; }
+  .qt-grid { grid-template-columns: 1fr; }
+  .ct-grid { grid-template-columns: 1fr; }
+  .ct-card, .ct-send { grid-column: 1; }
+}
+@media (max-width: 767px) {
+  .sv-list li { padding: 16px 18px; }
+  .ct-dl, .fm { grid-template-columns: 1fr; }
+  .ct-card .cl-ctas, .ct-card .cl-ctas .btn, .ct-send .btn, .fm .btn { width: 100%; }
+  .ct-big { font-size: calc(clamp(38px, 11vw, 52px) * var(--a11y-scale)); }
 }
