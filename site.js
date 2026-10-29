@@ -23,6 +23,21 @@
     rv.forEach(function (el) { io.observe(el); });
   } else rv.forEach(function (el) { el.classList.add('is-in'); });
 
+  /* ---------- מתג האור: יום וערב בכל האתר. ברירת המחדל בוקר (ליאב 28.10), ובחירה של הגולש נשמרת ---------- */
+  var swEls = [].slice.call(d.querySelectorAll('[data-light-sw]')), tcm = d.querySelector('meta[name="theme-color"]');
+  function lightUi() {
+    var on = html.getAttribute('data-light') === 'evening';
+    swEls.forEach(function (b) { b.setAttribute('aria-checked', on ? 'true' : 'false'); });
+    if (tcm) tcm.content = on ? '#061A2C' : '#E2E5E8';
+  }
+  function setLight(m, save) {
+    if (save) { try { localStorage.setItem('plomba-light', m); } catch (e) {} }
+    var apply = function () { html.setAttribute('data-light', m); lightUi(); };
+    if (d.startViewTransition && !still()) d.startViewTransition(apply); else apply();
+  }
+  swEls.forEach(function (b) { b.addEventListener('click', function () { setLight(html.getAttribute('data-light') === 'evening' ? 'day' : 'evening', true); }); });
+  lightUi();
+
   /* ---------- הדר: שקוף מעל ההירו, אטום בגלילה, נעלם למטה ---------- */
   var hd = d.getElementById('hd'), lastY = w.scrollY, ticking = false;
   var megaBtn = d.getElementById('mega-btn'), mega = d.getElementById('mega');
@@ -137,14 +152,17 @@
     var pc = d.querySelector('[data-circle]'); if (!pc) return null;
     var C = 1822.12, arc = pc.querySelector('.pc-arc'), num = d.getElementById('pc-n');
     var sts = [].slice.call(pc.querySelectorAll('.pc-st')), lbs = [].slice.call(pc.querySelectorAll('.pc-lb')), steps = [].slice.call(pc.querySelectorAll('.pc-step'));
+    var knob = pc.querySelector('.pc-knob'), names = knob ? (knob.getAttribute('data-steps') || '').split('|') : [];
     var api = { el: pc, st: null, on: 0 };
-    api.draw = function (p) { arc.style.strokeDashoffset = (C * (1 - clamp(p, 0, 1))).toFixed(2); };
+    // הכפתור במרכז מסתובב עם הקשת: הסימון שלו מצביע על המקום שהקשת הגיעה אליו
+    api.draw = function (p) { p = clamp(p, 0, 1); arc.style.strokeDashoffset = (C * (1 - p)).toFixed(2); if (knob) knob.style.setProperty('--a', (p * 360).toFixed(1)); };
     api.set = function (i) {
       if (i === api.on) return; api.on = i;
       sts.forEach(function (b, k) { b.classList.toggle('is-done', k < i); if (k === i) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current'); });
       lbs.forEach(function (l, k) { l.classList.toggle('is-on', k === i); });
       steps.forEach(function (s, k) { s.classList.toggle('is-on', k === i); });
       if (num) num.textContent = i + 1;
+      if (knob) { knob.setAttribute('aria-valuenow', i + 1); knob.setAttribute('aria-valuetext', 'שלב ' + (i + 1) + ' מתוך 4: ' + (names[i] || '')); }
     };
     var go = function (k) {
       var st = api.st;
@@ -153,25 +171,274 @@
     };
     sts.forEach(function (b, k) { b.addEventListener('click', function () { go(k); }); });
     lbs.forEach(function (l, k) { l.addEventListener('click', function () { go(k); }); });
+    if (knob) {
+      // מקלדת: חיצים, עמודים, בית וסוף, כמו כל מחוון
+      knob.addEventListener('keydown', function (e) {
+        var k = api.on, key = e.key;
+        if (key === 'ArrowUp' || key === 'ArrowLeft' || key === 'PageUp') k = Math.min(3, k + 1);
+        else if (key === 'ArrowDown' || key === 'ArrowRight' || key === 'PageDown') k = Math.max(0, k - 1);
+        else if (key === 'Home') k = 0;
+        else if (key === 'End') k = 3;
+        else return;
+        e.preventDefault(); go(k);
+      });
+      // סיבוב בגרירה רק בעכבר ובעט. במגע לחיצה עוברת לשלב הבא, כדי שהגלילה בטלפון לא תיתקע על החוגה
+      var drag = null, moved = false;
+      var angle = function (e) {
+        var r = knob.getBoundingClientRect(), a = Math.atan2(e.clientX - (r.left + r.width / 2), -(e.clientY - (r.top + r.height / 2))) * 180 / Math.PI;
+        return (a + 360) % 360;
+      };
+      knob.addEventListener('pointerdown', function (e) {
+        if (e.pointerType !== 'mouse' && e.pointerType !== 'pen') return;
+        if (e.button !== 0) return;
+        var a0 = angle(e); drag = { start: a0, last: a0, a: api.on * 90 + 45 }; moved = false;
+        knob.setPointerCapture(e.pointerId);
+      });
+      knob.addEventListener('pointermove', function (e) {
+        if (!drag) return;
+        var a = angle(e);
+        // בלי לעבור דרך האפס: הסיבוב נעצר בקצוות, כמו חוגה אמיתית
+        if (Math.abs(a - drag.last) > 180) a = drag.last > 180 ? 359.9 : 0;
+        if (!moved && Math.abs(a - drag.start) < 6) return;
+        if (!moved) { moved = true; pc.classList.add('is-drag'); }
+        drag.last = a; drag.a = a;
+        var st = api.st;
+        if (st) w.scrollTo(0, st.start + (st.end - st.start) * a / 360);
+        else { knob.style.setProperty('--a', a.toFixed(1)); api.set(Math.min(3, Math.floor(a / 90))); api.draw(a / 360); }
+      });
+      var end = function () {
+        if (!drag) return;
+        var a = drag.a; drag = null;
+        if (moved) { pc.classList.remove('is-drag'); go(Math.min(3, Math.floor(a / 90))); }
+      };
+      knob.addEventListener('pointerup', end);
+      knob.addEventListener('pointercancel', end);
+      knob.addEventListener('click', function () { if (moved) { moved = false; return; } go((api.on + 1) % 4); });
+    }
     return api;
   })();
 
-  /* ---------- סרטון הכרסומת: מתנגן רק כשהוא על המסך, ותמיד אפשר לעצור ---------- */
-  var wv = d.getElementById('why-v'), wp = d.getElementById('why-play');
-  if (wv && wp) {
-    var userPaused = still();
-    var vUi = function () { var p = wv.paused; wp.classList.toggle('is-paused', p); wp.setAttribute('aria-label', p ? 'הפעלת הסרטון' : 'עצירת הסרטון'); };
-    var vPlay = function () { var r = wv.play(); if (r && r.catch) r.catch(function () {}); };
-    wp.hidden = false;
-    wv.addEventListener('play', vUi); wv.addEventListener('pause', vUi);
-    wp.addEventListener('click', function () { if (wv.paused) { userPaused = false; vPlay(); } else { userPaused = true; wv.pause(); } });
-    if ('IntersectionObserver' in w) {
-      new IntersectionObserver(function (es) {
-        if (es[0].isIntersecting) { if (!userPaused && !still()) vPlay(); } else if (!wv.paused) wv.pause();
-      }, { threshold: .25 }).observe(wv);
+  /* ---------- ספק אחד: שלט אחד עובר בגלילה את כל הדרך, משרטוט עם מידות ועד הבורג האחרון.
+     בלי תנועה רואים את השלט הגמור. layout מודד את המילה ומסדר סביבה את הלוח, הברגים והמידות ---------- */
+  var why = (function () {
+    var sec = d.querySelector('[data-why]'); if (!sec) return null;
+    var svg = sec.querySelector('.wy-svg'), one = function (q) { return svg.querySelector(q); }, all = function (q) { return [].slice.call(svg.querySelectorAll(q)); };
+    var word = d.getElementById('wy-t'), grid = one('.wy-mesh'), out = one('.wy-out'), flat = one('.wy-flat'), sheet = one('.wy-sheet'), scribe = one('.wy-scribe');
+    var frame = one('.wy-frame'), corners = all('.wy-frame path'), dims = one('.wy-dims'), dl = all('.wy-dl'), lb = all('.wy-lb');
+    var laser = one('.wy-laser'), lz = all('.wy-laser rect'), spark = one('.wy-spark'), panel = one('.wy-panel'), pr = all('.wy-pr'), glint = one('.wy-glint');
+    var cast = one('.wy-cast'), halo = one('.wy-halo'), caps = all('.wy-cap'), rings = all('.wy-ring'), doneR = d.getElementById('wy-done-r'), rawR = d.getElementById('wy-raw-r');
+    var ok = sec.querySelector('.wy-ok'), steps = [].slice.call(sec.querySelectorAll('.wy-step'));
+    // W המילה, P לוח הזכוכית, S הגיליון שממנו חותכים. ברגים: קודם שניים למעלה (מימין), אחר כך למטה
+    var W = { x: 139, y: 220, w: 722, h: 182 }, P = { x: 103, y: 184, w: 794, h: 254 }, S = { x: 103, y: 190, w: 794, h: 242 };
+    var CAP = [[133, 214], [867, 214], [133, 408], [867, 408]], ORDER = [1, 0, 3, 2], OUT = 900, on = -1, live = false, last = 0;
+    var seg = function (p, a, b) { return clamp((p - a) / (b - a), 0, 1); };
+    var ease = function (k) { return k * k * (3 - 2 * k); };
+    var rect = function (e, r) { e.setAttribute('x', r.x.toFixed(1)); e.setAttribute('y', r.y.toFixed(1)); e.setAttribute('width', r.w.toFixed(1)); e.setAttribute('height', r.h.toFixed(1)); };
+    var capAt = function (g, i, s) { g.setAttribute('transform', 'translate(' + CAP[i][0].toFixed(1) + ' ' + CAP[i][1].toFixed(1) + ')' + (s ? ' scale(' + s.toFixed(3) + ')' : '')); };
+
+    var layout = function () {
+      var cs = getComputedStyle(word), cx = d.createElement('canvas').getContext('2d');
+      cx.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; cx.direction = 'rtl'; cx.textAlign = 'center';
+      var m = cx.measureText(word.textContent), l = m.actualBoundingBoxLeft, r = m.actualBoundingBoxRight, a = m.actualBoundingBoxAscent, ds = m.actualBoundingBoxDescent;
+      if (!(l + r > 0) || !(a + ds > 0)) return;
+      // קו הבסיס כך שהדיו של המילה ממורכז סביב 320
+      var base = Math.round(320 + (a - ds) / 2);
+      word.setAttribute('y', base);
+      W = { x: 500 - l, y: base - a, w: l + r, h: a + ds };
+      var x = W.x, y = W.y, w = W.w, h = W.h;
+      P = { x: x - 72, y: y - 66, w: w + 144, h: h + 132 }; pr.forEach(function (e) { rect(e, P); });
+      CAP = [[P.x + 30, P.y + 30], [P.x + P.w - 30, P.y + 30], [P.x + 30, P.y + P.h - 30], [P.x + P.w - 30, P.y + P.h - 30]];
+      caps.forEach(function (g, i) { capAt(g, i); });
+      S = { x: x - 36, y: y - 30, w: w + 72, h: h + 60 }; rect(sheet, S);
+      // שרטוט: רוחב מעל, גובה משמאל, וחץ לחומר מתחת
+      var fs = parseFloat(getComputedStyle(lb[0]).fontSize) || 23, yw = y - 46, xh = x - 46, mx = x + w * .27, my = y + h * .8, ly = y + h + 44;
+      dl[0].setAttribute('d', 'M' + x.toFixed(1) + ' ' + yw + 'H' + (x + w).toFixed(1) + 'M' + x.toFixed(1) + ' ' + (yw - 9) + 'v18M' + (x + w).toFixed(1) + ' ' + (yw - 9) + 'v18');
+      dl[1].setAttribute('d', 'M' + xh.toFixed(1) + ' ' + y.toFixed(1) + 'V' + (y + h).toFixed(1) + 'M' + (xh - 9).toFixed(1) + ' ' + y.toFixed(1) + 'h18M' + (xh - 9).toFixed(1) + ' ' + (y + h).toFixed(1) + 'h18');
+      dl[2].setAttribute('d', 'M' + (mx - 6).toFixed(1) + ' ' + my.toFixed(1) + 'h12M' + mx.toFixed(1) + ' ' + my.toFixed(1) + 'V' + ly.toFixed(1));
+      dl.forEach(function (e) { var n = Math.ceil(e.getTotalLength ? e.getTotalLength() : 800) + 2; e._len = n; e.setAttribute('stroke-dasharray', n + ' ' + n); });
+      lb[0].setAttribute('x', (x + w / 2).toFixed(1)); lb[0].setAttribute('y', (yw - 16).toFixed(1));
+      var hx = xh - 16, hy = y + h / 2;
+      lb[1].setAttribute('x', hx.toFixed(1)); lb[1].setAttribute('y', hy.toFixed(1)); lb[1].setAttribute('transform', 'rotate(-90 ' + hx.toFixed(1) + ' ' + hy.toFixed(1) + ')');
+      lb[2].setAttribute('x', mx.toFixed(1)); lb[2].setAttribute('y', (ly + fs * 1.1).toFixed(1));
+      // הדמיה: פינות של עינית סביב השלט
+      var F = { x: x - 52, y: y - 46, w: w + 104, h: h + 92 }, c = 34, X2 = F.x + F.w, Y2 = F.y + F.h;
+      var cd = [[F.x, F.y + c, F.x, F.y, F.x + c, F.y], [X2 - c, F.y, X2, F.y, X2, F.y + c], [F.x, Y2 - c, F.x, Y2, F.x + c, Y2], [X2 - c, Y2, X2, Y2, X2, Y2 - c]];
+      corners.forEach(function (e, i) { var q = cd[i].map(function (v) { return v.toFixed(1); }); e.setAttribute('d', 'M' + q[0] + ' ' + q[1] + 'L' + q[2] + ' ' + q[3] + 'L' + q[4] + ' ' + q[5]); });
+      lz.forEach(function (e) { e.setAttribute('y', (S.y - 26).toFixed(1)); e.setAttribute('height', (S.h + 52).toFixed(1)); });
+      glint.setAttribute('y', P.y.toFixed(1)); glint.setAttribute('height', P.h.toFixed(1));
+      out.setAttribute('stroke-dasharray', OUT + ' ' + OUT);
+      // מסגרת הציור צמודה לתוכן ושומרת אותו במרכז, כדי שבטלפון השלט יהיה גדול ככל האפשר
+      var half = Math.max(500 - (hx - fs), P.x + P.w + 30 - 500) + 16, vy = Math.min(yw - 16 - fs, P.y) - 18, vb = Math.max(ly + fs * 1.4, P.y + P.h + 40) + 14;
+      svg.setAttribute('viewBox', (500 - half).toFixed(1) + ' ' + vy.toFixed(1) + ' ' + (2 * half).toFixed(1) + ' ' + (vb - vy).toFixed(1));
+      ok.parentNode.style.setProperty('--okt', ((Y2 - vy) / (vb - vy) * 100).toFixed(2) + '%');
+    };
+
+    var render = function (p) {
+      last = p;
+      var k, op = function (e, v) { e.style.opacity = v.toFixed(3); };
+      // 1. שרטוט: רשת, קו המתאר נמשך, ואז המידות
+      op(grid, (1 - .65 * seg(p, .26, .34)) * (1 - seg(p, .5, .58)));
+      out.style.strokeDashoffset = (OUT * (1 - ease(seg(p, 0, .2)))).toFixed(1);
+      op(out, (1 - .75 * seg(p, .28, .4)) * (1 - seg(p, .5, .56)));
+      op(dims, (p > .09 ? 1 : 0) * (1 - seg(p, .26, .32)));
+      k = ease(seg(p, .1, .22)); dl.forEach(function (e) { e.style.strokeDashoffset = (e._len * (1 - k)).toFixed(1); });
+      k = seg(p, .16, .24); lb.forEach(function (e) { op(e, k); });
+      // 2. הדמיה: המילה מתמלאת בצבע, עינית סביבה, והלוחית "ההדמיה אושרה"
+      op(flat, seg(p, .28, .4) * (1 - seg(p, .52, .58)));
+      op(frame, seg(p, .3, .38) * (1 - seg(p, .5, .54)));
+      frame.style.transform = 'scale(' + (1.06 - .06 * ease(seg(p, .3, .4))).toFixed(4) + ')';
+      k = seg(p, .38, .46) * (1 - seg(p, .5, .54));
+      ok.style.opacity = k.toFixed(3); ok.style.visibility = k > 0 ? 'visible' : 'hidden';
+      ok.style.transform = 'translateY(' + ((1 - ease(seg(p, .38, .46))) * 10).toFixed(1) + 'px)';
+      // 3. ייצור: גיליון עם קו חיתוך, והלייזר עובר מימין לשמאל. מה שמימינו כבר אות עם דופן
+      op(sheet, seg(p, .52, .58)); op(scribe, seg(p, .55, .6));
+      var cut = p < .58 ? S.x + S.w + 40 : S.x + S.w - S.w * ease(seg(p, .58, .72));
+      doneR.setAttribute('x', cut.toFixed(1)); doneR.setAttribute('width', Math.max(0, 1000 - cut).toFixed(1));
+      rawR.setAttribute('width', Math.max(0, cut).toFixed(1));
+      op(laser, seg(p, .56, .58) * (1 - seg(p, .72, .74)));
+      laser.setAttribute('transform', 'translate(' + cut.toFixed(1) + ' 0)');
+      spark.setAttribute('cy', (W.y + W.h * (.5 + .42 * Math.sin(p * 260))).toFixed(1));
+      // 4. התקנה: לוח הזכוכית, הצל נצמד לקיר כשהשלט מתקרב אליו, ארבעה ברגים, והאור נדלק
+      k = ease(seg(p, .76, .84)); op(panel, k); panel.style.transform = 'scale(' + (.94 + .06 * k).toFixed(4) + ')';
+      k = ease(seg(p, .78, .88)); op(cast, k); cast.style.transform = 'translate(' + ((1 - k) * 18).toFixed(1) + 'px,' + ((1 - k) * 24).toFixed(1) + 'px)';
+      caps.forEach(function (g, i) {
+        var t0 = .83 + .028 * ORDER.indexOf(i), r = seg(p, t0 + .015, t0 + .065);
+        op(g, seg(p, t0, t0 + .012)); capAt(g, i, 1.35 - .35 * ease(seg(p, t0, t0 + .03)));
+        rings[i].setAttribute('r', (13 + 26 * r).toFixed(1)); op(rings[i], r > 0 && r < 1 ? .9 * (1 - r) : 0);
+      });
+      // ההילה נראית רק בתאורת ערב, ולכן ההבהוב שלה נכתב רק שם
+      k = seg(p, .9, .98);
+      if (d.documentElement.dataset.light === 'evening') halo.style.setProperty('--hl', (p < .9 ? 0 : k < .3 ? k / .3 * .85 : k < .42 ? .85 - (k - .3) / .12 * .75 : k < .56 ? .1 + (k - .42) / .14 * .9 : 1).toFixed(3));
+      else halo.style.removeProperty('--hl');
+      k = seg(p, .92, 1); glint.setAttribute('x', (P.x - 160 + (P.w + 160) * ease(k)).toFixed(1)); op(glint, k > 0 && k < 1 ? 1 : 0);
+      var i = Math.min(3, Math.floor(p * 4));
+      if (i !== on) { on = i; steps.forEach(function (s, j) { s.classList.toggle('is-on', j === i); }); }
+    };
+
+    var reset = function () {
+      live = false; on = -1; sec.classList.remove('gsap-live');
+      [grid, out, flat, sheet, scribe, frame, dims, laser, panel, cast, glint, ok].concat(dl, lb, caps, rings).forEach(function (e) { e.removeAttribute('style'); });
+      halo.style.removeProperty('--hl');
+      doneR.setAttribute('x', 0); doneR.setAttribute('width', 1000); rawR.setAttribute('width', 0);
+      laser.removeAttribute('transform'); glint.setAttribute('x', -160);
+      caps.forEach(function (g, i) { capAt(g, i); }); rings.forEach(function (r) { r.setAttribute('r', 13); });
+      steps.forEach(function (s) { s.classList.remove('is-on'); });
+    };
+
+    var fit = function () { layout(); if (live) render(last); };
+    fit();
+    if (d.fonts) { var cs0 = getComputedStyle(word); d.fonts.load(cs0.fontWeight + ' 150px ' + cs0.fontFamily, word.textContent).then(fit, fit); d.fonts.ready.then(fit); }
+    return { list: sec.querySelector('.wy-steps'), stage: sec.querySelector('.wy-stage'), render: render, reset: reset,
+      start: function () { live = true; sec.classList.add('gsap-live'); render(0); } };
+  })();
+
+  /* ---------- עבודות: לוחות לאורך הקיר. הלוח שהכי קרוב לאמצע המסך מתרומם מהקיר (--l), וההשתקפות והצילום זזים לפי המרחק שלו מהאמצע (--d).
+     בדסקטופ הגלילה מזיזה את המסילה (ב-motion), עד 1023 גוללים אותה באצבע. בלי תנועה כל הלוחות דולקים, והמונה והפס עדיין עוקבים ---------- */
+  var works = (function () {
+    var sc = d.querySelector('[data-works]'); if (!sc) return null;
+    var view = sc.querySelector('.wk-view'), track = sc.querySelector('.wk-track'), its = [].slice.call(track.children);
+    var num = sc.querySelector('.wk-i'), nm = sc.querySelector('.wk-nm'), rail = sc.querySelector('.wk-rail');
+    var names = its.map(function (li) { var b = li.querySelector('.wt b'); return b ? b.textContent : ''; });
+    var last = its.length - 2, on = 0, raf = 0, wd = 0;
+    var lift = function (p) {
+      raf = 0;
+      var vw = innerWidth, flat = still() || (vw >= 1024 && !sc.classList.contains('gsap-live')), near = 0, nd = 9;
+      its.forEach(function (li, i) {
+        var r = li.getBoundingClientRect(), dd = (r.left + r.width / 2 - vw / 2) / (vw * .45), a = Math.min(1, Math.abs(dd));
+        if (i <= last) { // כרטיס הסיום לא מתרומם ואין בו צילום שזז
+          li.style.setProperty('--l', flat ? 1 : (1 - a * a * (3 - 2 * a)).toFixed(3));
+          li.style.setProperty('--d', flat ? 0 : clamp(dd, -1.2, 1.2).toFixed(3));
+        }
+        if (Math.abs(dd) < nd) { nd = Math.abs(dd); near = i; }
+      });
+      near = Math.min(near, last);
+      if (near !== on) { on = near; num.textContent = (near < 9 ? '0' : '') + (near + 1); nm.textContent = names[near]; }
+      if (p == null) { var mx = view.scrollWidth - view.clientWidth; p = mx > 0 ? Math.abs(view.scrollLeft) / mx : 0; }
+      rail.style.setProperty('--wp', (.12 + .88 * clamp(p, 0, 1)).toFixed(3));
+    };
+    var ask = function () { if (!raf) raf = requestAnimationFrame(function () { lift(); }); };
+    view.addEventListener('scroll', ask, { passive: true });
+    w.addEventListener('resize', ask);
+    w.addEventListener('load', ask);
+    lift();
+    // הגובה נמדד לפני כל רענון של ScrollTrigger, כשהמסילה עדיין במקום. המסלול עד שני מסכים, כדי שהעמוד לא ירגיש תקוע
+    var size = function () { wd = Math.max(0, track.scrollWidth - view.clientWidth); sc.style.height = Math.round(innerHeight + Math.min(wd * 1.1, innerHeight * 2)) + 'px'; };
+    return { sc: sc, track: track, lift: lift, dist: function () { return wd; },
+      start: function () { sc.classList.add('gsap-live'); size(); ScrollTrigger.addEventListener('refreshInit', size); },
+      reset: function () { sc.classList.remove('gsap-live'); sc.style.height = ''; ScrollTrigger.removeEventListener('refreshInit', size); lift(); } };
+  })();
+
+  /* ---------- כניסה להדמיה: לפני ואחרי. גוררים את הקו (עכבר או אצבע), או חיצים על הטווח המוסתר.
+     כשרוב התמונה על המסך הקו נכנס מימין ועוצר באמצע הלוגו, כדי שיהיה ברור שאפשר לגרור ---------- */
+  var cmp = d.querySelector('.cmp');
+  if (cmp) {
+    var rg = cmp.querySelector('.cmp-range'), END = parseFloat(getComputedStyle(cmp).getPropertyValue('--end')) || 30, sweep = 0, dragging = false;
+    // cut הוא המרחק של הקו מהקצה השמאלי באחוזים; הטווח סופר כמה מהקיר מוצג עם השלט
+    var setCut = function (c) {
+      c = Math.max(0, Math.min(100, c));
+      cmp.style.setProperty('--cut', c + '%');
+      var v = Math.round(100 - c);
+      rg.value = v; rg.setAttribute('aria-valuetext', v + ' אחוז מהקיר עם השלט');
+      cmp.classList.toggle('is-b-off', c < 12);
+      cmp.classList.toggle('is-a-off', c > 88);
+    };
+    var stop = function () { if (sweep) { cancelAnimationFrame(sweep); sweep = 0; } };
+    var at = function (e) { var r = cmp.getBoundingClientRect(); return ((e.clientX - r.left) / r.width) * 100; };
+    cmp.addEventListener('pointerdown', function (e) {
+      if (e.button !== 0) return;
+      stop(); dragging = true; cmp.classList.add('is-drag');
+      try { cmp.setPointerCapture(e.pointerId); } catch (x) {}
+      setCut(at(e));
+    });
+    cmp.addEventListener('pointermove', function (e) { if (dragging) setCut(at(e)); });
+    var up = function () { dragging = false; cmp.classList.remove('is-drag'); };
+    cmp.addEventListener('pointerup', up); cmp.addEventListener('pointercancel', up);
+    rg.addEventListener('input', function () { stop(); setCut(100 - rg.value); });
+    if (still() || !('IntersectionObserver' in w)) setCut(END);
+    else {
+      setCut(100);
+      var cmpo = new IntersectionObserver(function (es) {
+        if (!es[0].isIntersecting) return;
+        cmpo.disconnect();
+        var t0 = 0, dur = 1700;
+        var step = function (t) {
+          if (!t0) t0 = t;
+          var k = Math.min(1, (t - t0) / dur), e = k < .5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+          setCut(100 + (END - 100) * e);
+          sweep = k < 1 ? requestAnimationFrame(step) : 0;
+        };
+        sweep = requestAnimationFrame(step);
+      }, { threshold: .55 });
+      cmpo.observe(cmp);
     }
-    vUi();
   }
+
+  /* ---------- שאלות: הגובה של התשובה נפתח ונסגר ברכות (WAAPI), והתשובה עולה מתוכו. בלי תנועה, הפתיחה הרגילה של הדפדפן ---------- */
+  d.querySelectorAll('details.fq').forEach(function (el) {
+    var sum = el.querySelector('summary'), anim = null, to = null;
+    var done = function () { el.open = to; anim = null; to = null; el.classList.remove('is-anim', 'is-shut'); el.style.height = ''; };
+    var run = function (a, b) {
+      if (anim) anim.cancel();
+      anim = el.animate({ height: [a + 'px', b + 'px'] }, { duration: clamp(Math.abs(b - a) * 1.8, 440, 680), easing: 'cubic-bezier(.22,.61,.36,1)' });
+      anim.onfinish = done;
+    };
+    sum.addEventListener('click', function (e) {
+      if (still() || !el.animate) return;
+      e.preventDefault();
+      var h = el.offsetHeight;
+      el.classList.add('is-anim');
+      if (to === false || !el.open) {
+        // פותחים: הגובה הנוכחי נשמר, התוכן נכנס לדום, ואז מודדים את הגובה הפתוח
+        to = true; el.style.height = h + 'px'; el.open = true; el.classList.add('is-shut');
+        el.style.height = ''; var full = el.offsetHeight; el.style.height = h + 'px';
+        requestAnimationFrame(function () { el.classList.remove('is-shut'); });
+        run(h, full);
+      } else {
+        to = false; el.classList.add('is-shut');
+        run(h, sum.offsetHeight);
+      }
+    });
+  });
 
   /* ---------- סצנות גלילה (GSAP) ---------- */
   var scenes = [];
@@ -193,25 +460,22 @@
           .to('.hero-copy', { yPercent: c.md ? -10 : -5, opacity: .2, ease: 'none' }, 0)
           .to('.hero-glow', { opacity: .55, ease: 'none' }, 0);
       }
-      // MV:g90 · אנטומיה של אות: השכבות נפרדות מהקיר, ובכל שלב שכבה אחת מוארת
-      var an = d.querySelector('[data-anat]');
-      if (an && c.md) {
-        var anRig = d.getElementById('an-rig'), anItems = an.querySelectorAll('.an-list li'); an.classList.add('gsap-live');
-        var ao = { x: 0, ry: 12, rx: 6 }, aOn = -1;
-        var aPut = function () {
-          anRig.style.setProperty('--x', ao.x.toFixed(3)); anRig.style.setProperty('--ry', ao.ry.toFixed(2)); anRig.style.setProperty('--rx', ao.rx.toFixed(2));
-          var p = ta.progress(), i = p < .2 ? -1 : Math.min(3, Math.floor((p - .2) / .8 * 4));
-          if (i !== aOn) { aOn = i; anItems.forEach(function (li, k) { li.classList.toggle('is-on', k === i); });
-            if (i < 0) anRig.removeAttribute('data-on'); else anRig.setAttribute('data-on', anItems[i].getAttribute('data-part')); }
-        };
-        var ta = gsap.timeline({ scrollTrigger: { trigger: an, start: 'top top', end: 'bottom bottom', scrub: .6 }, onUpdate: aPut });
-        ta.to(ao, { x: 1, ry: 40, rx: 12, duration: 1, ease: 'power2.inOut' }).to(ao, { ry: 28, duration: 4, ease: 'none' });
-        aPut();
+      // ספק אחד: הגלילה מעבירה שלט אחד את כל הדרך. כל רבע היא נקודה אחת, והיא מתחילה כשהנקודה מגיעה לאמצע השטח הפנוי
+      if (why && why.list) {
+        why.start();
+        var wl = why.list, wo = { p: 0 };
+        var wcy = function () { var V = innerHeight; return c.lg ? V / 2 : (Math.min(V, 76 + why.stage.offsetHeight) + V) / 2; };
+        gsap.to(wo, { p: 1, ease: 'none', onUpdate: function () { why.render(wo.p); },
+          scrollTrigger: { trigger: wl, scrub: .6, invalidateOnRefresh: true,
+            start: function () { return 'top ' + Math.round(wcy() - parseFloat(getComputedStyle(wl).paddingTop)) + 'px'; },
+            end: function () { return 'bottom ' + Math.round(wcy() + parseFloat(getComputedStyle(wl).paddingBottom)) + 'px'; } } });
       }
-      // עבודות נבחרות: כל אריח נחשף מלמטה ונדלק כשהוא נכנס, והתמונה מתכווצת לגודלה (--on ב-CSS)
-      gsap.utils.toArray('[data-works] .wk').forEach(function (li) {
-        gsap.fromTo(li, { '--on': 0, '--cy': '18%' }, { '--on': 1, '--cy': '0%', ease: 'none', scrollTrigger: { trigger: li, start: 'top 92%', end: 'top 50%', scrub: .6 } });
-      });
+      // עבודות, MV:G1: הסקשן נעוץ, והגלילה מעבירה את הלוחות לאורך הקיר. גובה הסקשן הוא המרחק שהמסילה עוברת
+      if (works && c.lg) {
+        works.start();
+        gsap.to(works.track, { x: works.dist, ease: 'none', onUpdate: function () { works.lift(this.progress()); },
+          scrollTrigger: { trigger: works.sc, start: 'top top', end: 'bottom bottom', scrub: .6, invalidateOnRefresh: true } });
+      }
       // העיגול נעוץ, והגלילה מקיפה אותו: כל רבע הוא שלב
       if (circle && c.lg) {
         circle.el.classList.add('gsap-live');
@@ -222,8 +486,10 @@
         circle.draw(0);
       }
       return function () {
-        d.querySelectorAll('.an, .pc').forEach(function (e) { e.classList.remove('gsap-live'); });
+        d.querySelectorAll('.pc').forEach(function (e) { e.classList.remove('gsap-live'); });
+        if (works) works.reset();
         if (circle) { circle.st = null; circle.set(0); circle.draw(.125); }
+        if (why) why.reset();
       };
     });
     scenes.push(mm);
@@ -231,10 +497,6 @@
   }
   if (d.readyState === 'complete' || d.readyState === 'interactive') motion(); else d.addEventListener('DOMContentLoaded', motion);
 
-
-  /* ---------- אנטומיה: הדופן היא שכבות של אותה אות ---------- */
-  var anSide = d.getElementById('an-side');
-  if (anSide) { for (var ai = 0; ai < 16; ai++) { var sp = d.createElement('span'); sp.style.setProperty('--i', ai); sp.style.setProperty('--c', 'hsl(208 14% ' + Math.round(70 - ai * 2.6) + '%)'); anSide.appendChild(sp); } }
 
   /* ---------- נסו על השם שלכם ---------- */
   (function configurator() {
@@ -265,7 +527,7 @@
     function color() { var v = val('color'); return v === 'custom' ? custom.value.toUpperCase() : v; }
 
     // מתאים את הגודל לבמה: שם בגולן, או לוגו לפי היחס שלו
-    var meas = d.createElement('span'); meas.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:600 100px/1 Golan, GS, sans-serif;inset-inline-start:-9999px;top:0';
+    var meas = d.createElement('span'); meas.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;font:600 100px/1 GSD, GS, sans-serif;inset-inline-start:-9999px;top:0';
     d.body.appendChild(meas);
     function fit(text) {
       var W = stage.clientWidth, H = stage.clientHeight;
@@ -406,7 +668,6 @@
       html.style.setProperty('--a11y-scale', scale);
       ['contrast', 'invert', 'gray', 'links', 'font', 'spacing', 'nomotion', 'cursor', 'guide'].forEach(function (k) { html.classList.toggle('a11y-' + k, !!state[k]); });
       panel.querySelectorAll('[data-a11y]').forEach(function (b) { var k = b.getAttribute('data-a11y'); if (k in state) b.setAttribute('aria-pressed', state[k] ? 'true' : 'false'); });
-      if (state.nomotion) { var v = d.getElementById('why-v'); if (v && !v.paused) v.pause(); }
       if (state.nomotion && w.ScrollTrigger) { scenes.forEach(function (m) { m.revert(); }); scenes = []; ScrollTrigger.getAll().forEach(function (t) { t.kill(true); }); }
       try { state.scale = scale; localStorage.setItem('plomba-a11y', JSON.stringify(state)); } catch (e) {}
     }

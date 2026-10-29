@@ -1,0 +1,285 @@
+/* הדמיית שלט על הקיר (simulator.html). שפת האתר s13 מ-site.css; בתוך הכלי צפיפות של אפליקציה: בלי כניסות בגלילה, מצבי טעינה ושגיאה מעוצבים.
+   הקווים כאן הם כלי עבודה (סימון הקיר, מסגרת השלט, פס ההתקדמות), לא קישוט. */
+
+.sim [hidden] { display: none !important; }
+/* זכוכית מעל הצילום לפי מצב התאורה של העמוד; הסימונים שעל הצילום עצמו נשארים בהירים בשני המצבים, כי הצילום לא משתנה */
+.sim { --sim-glass: rgba(4,18,31,.66); --sim-glass-sh: 0 0 0 transparent; }
+html[data-light="day"] .sim { --sim-glass: rgba(238,240,242,.9); --sim-glass-sh: 0 6px 18px rgba(4,18,31,.22), 0 1px 2px rgba(4,18,31,.18); }
+.sim-host { --hud: #EDE5D3; }
+
+/* ===== כותרת העמוד: קצרה, כדי שהכלי ייכנס למסך הראשון ===== */
+.sim-ph { padding-block: calc(var(--sec) * .28 + 96px) calc(var(--sec) * .2); }
+.sim-ph .lead { margin-block-end: 0; max-width: 62ch; }
+
+/* ===== הכלי: ההדמיה בצד הפתיחה ודביקה, השלבים לידה ===== */
+.sim { padding-block-end: calc(var(--sec) * .55); }
+.sim-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--col-gap); align-items: start; }
+.sim-view { grid-column: 1 / span 8; position: sticky; top: 96px; display: grid; gap: 10px; }
+.sim-panel { grid-column: 9 / span 4; display: grid; gap: 24px; min-width: 0; }
+.sim-grid.is-failed .sim-view { grid-column: 1 / -1; position: static; }
+
+.sim-host { position: relative; width: 100%; aspect-ratio: var(--ar, 4 / 3); min-height: 320px; max-height: clamp(380px, calc(100svh - 180px), 780px);
+  border-radius: var(--r-2); overflow: hidden; isolation: isolate; background: var(--bg-deep); user-select: none; -webkit-user-select: none; }
+.sim-canvas, .sim-overlay { position: absolute; display: block; }
+.sim-canvas { z-index: 1; touch-action: none; }
+.sim-canvas:focus-visible { outline: 2px solid var(--hud); outline-offset: -2px; }
+.sim-host.is-dragging .sim-canvas { cursor: grabbing !important; }
+
+/* המסגרת והפינות של השלט (שלב "השלט"); המגע בפינה רחב מהעיגול שרואים */
+.sim-overlay { z-index: 2; overflow: visible; pointer-events: none; }
+.sim-frame { /* qa-allow: line (מסגרת השלט שנגררת) */ fill: none; stroke: var(--hud); stroke-width: 1; stroke-dasharray: 5 5; opacity: .8; }
+.sim-handle { fill: var(--hud); stroke: transparent; stroke-width: 26px; pointer-events: all; cursor: nwse-resize; touch-action: none;
+  filter: drop-shadow(0 0 1.5px rgba(4,18,31,.95)); }
+.sim-handle[data-i="1"], .sim-handle[data-i="3"] { cursor: nesw-resize; }
+
+/* סימון הקיר: מחוץ לסימון מוחשך, הרוחב כתוב על הצלע העליונה */
+.sim-mark { position: absolute; z-index: 3; overflow: visible; pointer-events: none; }
+.sim-mark-dim { fill: rgba(4,18,31,.45); fill-rule: evenodd; }
+.sim-mark-q { /* qa-allow: line (קווי הסימון על הצילום) */ fill: none; stroke: var(--hud); stroke-width: 1.5; stroke-linejoin: round; }
+.sim-mark-w { fill: var(--hud); stroke: rgba(4,18,31,.85); stroke-width: 4px; stroke-linejoin: round; paint-order: stroke; font: 500 calc(14px * var(--a11y-scale)) var(--font-t);
+  text-anchor: middle; direction: rtl; }
+.sim-mh { pointer-events: all; cursor: grab; touch-action: none; outline: none; }
+.sim-mark.is-dragging .sim-mh { cursor: grabbing; }
+.sim-mh .hit { fill: transparent; }
+.sim-mh .ring { /* qa-allow: line (טבעת הפינה) */ fill: rgba(4,18,31,.35); stroke: var(--hud); stroke-width: 2; transition: stroke-width .15s var(--ease); }
+.sim-mh .dot { fill: var(--hud); }
+.sim-mh:hover .ring, .sim-mh:focus-visible .ring { stroke-width: 3.5; }
+.sim-mh:focus-visible .ring { stroke: var(--cyan); }
+
+/* זכוכית מגדלת מעל הפינה שנגררת. הטבעות מפרידות אותה מהצילום, בלי צל */
+.sim-loupe { position: absolute; z-index: 4; width: 132px; height: 132px; border-radius: 50%; pointer-events: none;
+  box-shadow: 0 0 0 2px var(--hud), 0 0 0 5px rgba(4,18,31,.6); }
+
+/* איכות צילום: התמונה המחודדת עולה מעל ההדמיה הרגילה כשהיא מוכנה, ומתחת למסגרת ולפינות.
+   במבט מסובב היא מכסה את כל ההדמיה, והגרירה עוברת דרכה לתצוגה החיה שמתחתיה */
+.sim-real { position: absolute; display: block; z-index: 1; pointer-events: none; opacity: 0; transition: opacity .45s var(--ease); }
+.sim-real:not(.is-on) { transition-duration: .15s; }
+.sim-real.is-on { opacity: 1; }
+.sim-real.is-before { opacity: 0; transition: none; }
+.sim-host.is-side .sim-overlay { visibility: hidden; }
+
+/* התג שמראה שהתמונה מתחדדת, עם פס התקדמות דק */
+.sim-q { position: absolute; z-index: 4; inset-block-start: 10px; inset-inline-start: 10px; display: grid; gap: 6px; padding: 8px 12px; border-radius: var(--r-1);
+  background: var(--sim-glass); box-shadow: var(--sim-glass-sh); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); color: var(--ink); font-size: calc(13px * var(--a11y-scale)); line-height: 1.2;
+  pointer-events: none; opacity: 0; transition: opacity .3s var(--ease); }
+.sim-q.is-on { opacity: 1; }
+.sim-q-bar { /* qa-allow: line (פס ההתקדמות של הרינדור) */ display: block; width: 44px; height: 2px; border-radius: 1px; background: color-mix(in srgb, var(--ink) 20%, transparent); overflow: hidden; }
+.sim-q-bar i { display: block; height: 100%; background: var(--cream); transform: scaleX(var(--p, 0)); transform-origin: right; transition: transform .2s linear; }
+
+/* זווית הצפייה: מקדימה, מימין, משמאל, ורמז שאפשר גם לגרור. יושבת על פינת ההדמיה (אותו תא בגריד), ובטלפון יורדת לשורה משלה כדי לא לכסות את השלט */
+.sim-view > .sim-host, .sim-view > .sim-ang { grid-area: 1 / 1; }
+.sim-ang { position: relative; z-index: 4; align-self: end; justify-self: end; margin: 10px; display: flex; padding: 3px; border-radius: var(--r-1);
+  background: var(--sim-glass); box-shadow: var(--sim-glass-sh); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.sim-host[aria-busy="true"] ~ .sim-ang { visibility: hidden; }
+.sim-ang label { position: relative; display: block; }
+.sim-ang input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.sim-ang span { display: flex; align-items: center; min-height: 40px; padding: 0 12px; border-radius: calc(var(--r-1) - 2px); color: var(--ink);
+  font-size: calc(14px * var(--a11y-scale)); transition: background-color .2s var(--ease), color .2s var(--ease); }
+.sim-ang input:checked + span { background: var(--cream); color: var(--on-cream); }
+.sim-ang input:focus-visible + span { outline: 2px solid var(--cream); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .sim-ang input:not(:checked):hover + span { background: color-mix(in srgb, var(--ink) 9%, transparent); } }
+.sim-grid[data-step="1"] .sim-ang { display: none; }
+.sim-ang .sim-ang-hint { gap: 6px; padding-inline: 8px 10px; font-size: calc(13px * var(--a11y-scale)); white-space: nowrap; }
+.sim-ang-hint svg { flex: none; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.sim-ang-hint b { font-weight: inherit; }
+
+.sim-busy { position: absolute; inset: 0; z-index: 5; display: grid; place-content: center; justify-items: center; gap: 14px; padding: 24px; text-align: center;
+  background: var(--sim-glass); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); color: var(--ink); font-size: var(--fs-meta); }
+.sim-grid:not(.is-ready) .sim-busy { background: var(--bg-deep); }
+.sim-spin { width: 34px; height: 34px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--ink) 16%, transparent); border-block-start-color: var(--cream); animation: sim-spin .9s linear infinite; }
+@keyframes sim-spin { to { transform: rotate(1turn); } }
+.sim-fail { position: absolute; inset: 0; z-index: 6; display: grid; place-content: center; justify-items: start; gap: 20px; padding: clamp(24px, 4vw, 56px); background: var(--bg-deep); }
+.sim-fail p { max-width: 44ch; color: var(--ink-soft); }
+.sim-nojs { grid-column: 1 / -1; padding: 24px; border-radius: var(--r-2); background: var(--surface); color: var(--ink-soft); }
+.sim-nojs a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+
+.sim-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 20px; min-height: 44px; }
+.sim-before { min-height: 40px; padding: 0 16px; border-radius: var(--r-1); background: var(--surface); color: var(--ink-soft); font-size: calc(15px * var(--a11y-scale));
+  touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; transition: background-color .2s var(--ease), color .2s var(--ease); }
+.sim-before.is-on { background: var(--cream); color: var(--on-cream); }
+@media (hover: hover) and (pointer: fine) { .sim-before:not(.is-on):hover { background: var(--surface-hi); color: var(--ink); } }
+.sim-read { margin-inline-start: auto; color: var(--muted); font-size: var(--fs-meta); }
+.sim-read b { color: var(--cream); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* ===== הפאנל ===== */
+.sim-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+.sim-st { /* qa-allow: line (פס ההתקדמות מעל כל שלב) */ position: relative; width: 100%; display: flex; align-items: center; gap: 6px; min-height: 44px; padding-block-start: 12px;
+  color: var(--muted); font-size: calc(13px * var(--a11y-scale)); line-height: 1.2; text-align: start; white-space: nowrap; transition: color .2s var(--ease); }
+.sim-st::before { content: ""; position: absolute; inset-inline: 0; inset-block-start: 0; height: 3px; border-radius: 2px; background: var(--surface-hi); transition: background-color .3s var(--ease); }
+.sim-st .num { font-variant-numeric: tabular-nums; color: inherit; }
+.sim-st.is-done::before { background: rgba(232,223,203,.3); }
+.sim-st[aria-current="step"] { color: var(--ink); }
+.sim-st[aria-current="step"]::before { background: var(--cream); }
+.sim-st[aria-current="step"] .num { color: var(--cream); }
+@media (hover: hover) and (pointer: fine) { .sim-st:not([aria-current]):hover { color: var(--ink-soft); } }
+
+.sim-step { display: grid; gap: 16px; align-content: start; }
+.sim-h { font-family: var(--font-d); font-weight: 600; font-size: calc(clamp(24px, 1.2vw + 12px, 32px) * var(--a11y-scale)); line-height: 1.15; scroll-margin-top: 112px; }
+.sim-h:focus { outline: none; }
+.sim-h:focus-visible { outline: 2px solid var(--cream); outline-offset: 4px; }
+.sim-p { color: var(--ink-soft); font-size: calc(16px * var(--a11y-scale)); line-height: 1.6; max-width: 52ch; }
+.sim-panel .grp { display: grid; gap: 10px; }
+.sim-panel legend:not(.sr-only), .sim-panel .lbl { display: flex; justify-content: space-between; gap: 12px; width: 100%; padding: 0; margin-block-end: 10px;
+  font-size: calc(15px * var(--a11y-scale)); font-weight: 500; color: var(--ink-soft); }
+.sim-panel .lbl { margin: 0; }
+.sim-panel output { color: var(--cream); font-variant-numeric: tabular-nums; }
+.sim-panel .grp > .sim-fine { margin-block-start: -2px; }
+
+.sim-drop { display: grid; justify-items: center; gap: 4px; padding: 24px 20px; border-radius: var(--r-2); background: var(--surface); text-align: center; cursor: pointer;
+  transition: background-color .2s var(--ease); }
+.sim-drop svg { width: 26px; height: 26px; color: var(--cream); margin-block-end: 8px; }
+.sim-drop b { font-weight: 500; color: var(--ink); }
+.sim-drop small { color: var(--muted); font-size: var(--fs-meta); }
+.sim-drop:focus-within { outline: 2px solid var(--cream); outline-offset: 3px; }
+.sim-drop.is-over { background: var(--surface-hi); outline: 2px dashed var(--cream); outline-offset: -8px; }
+@media (hover: hover) and (pointer: fine) { .sim-drop:hover { background: var(--surface-hi); } }
+
+.sim-fine { font-size: calc(14px * var(--a11y-scale)); line-height: 1.5; color: var(--muted); max-width: 56ch; }
+.sim-fine:empty { display: none; }
+.sim-fine a { color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; }
+.sim-err { padding: 12px 16px; border-radius: var(--r-1); background: rgba(255,140,120,.1); color: #FFC2B6; font-size: calc(15px * var(--a11y-scale)); line-height: 1.5; }
+.sim-note, .sim-demo-block { padding: 12px 16px; border-radius: var(--r-1); background: var(--surface); color: var(--ink-soft); font-size: calc(15px * var(--a11y-scale)); line-height: 1.5; }
+.sim-err a, .sim-note a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+html[data-light="day"] .sim-err { background: rgba(170,48,24,.08); color: #8E2A14; }
+.sim-link { min-height: 44px; justify-self: start; color: var(--ink); font-size: calc(15px * var(--a11y-scale)); text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+  text-underline-offset: 4px; }
+.sim-note .sim-link { min-height: 0; }
+.sim-demo-block { display: grid; gap: 2px; }
+
+/* הסברים: כפתור i בולט כמו כפתורי ההדר, וההסבר נפתח כגומחה שקועה מתחת לכותרת.
+   הרווח שמתחת להסבר הוא חלק מהגובה שלו, ולכן הוא נפתח ונסגר בלי קפיצה */
+.tip-l { display: inline-flex; align-items: center; gap: 10px; }
+.tip-b { position: relative; display: inline-grid; place-items: center; width: 28px; height: 28px; flex: none; border-radius: 50%;
+  background: var(--wall); box-shadow: var(--sh-s); color: var(--ink-soft); transition: box-shadow .25s var(--ease), color .2s var(--ease); }
+.tip-b::before { content: ""; position: absolute; inset: -8px; }
+.tip-b svg, .tip-link svg { overflow: visible; }
+.tip-b circle, .tip-link circle { fill: currentColor; }
+.tip-b path, .tip-link path { fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; }
+.tip-b[aria-expanded="true"] { box-shadow: var(--in-s); color: var(--cream); }
+.tip-b:focus-visible { border-radius: 50%; }
+@media (hover: hover) and (pointer: fine) { .tip-b:hover { color: var(--ink); } }
+.tip-link { justify-self: start; display: inline-flex; align-items: center; gap: 10px; min-height: 44px; color: var(--ink); font-size: calc(15px * var(--a11y-scale));
+  text-decoration: underline; text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent); text-underline-offset: 4px; }
+.tip-link svg { box-sizing: content-box; width: 12px; height: 12px; padding: 8px; border-radius: 50%; background: var(--wall); box-shadow: var(--sh-s); color: var(--ink-soft);
+  transition: box-shadow .25s var(--ease), color .2s var(--ease); }
+.tip-link[aria-expanded="true"] svg { box-shadow: var(--in-s); color: var(--cream); }
+.tip { display: flow-root; overflow: hidden; margin-block-end: -10px; }
+.tip-in { margin-block-end: 10px; padding: 14px 16px; border-radius: var(--r-1); box-shadow: var(--in-s); color: var(--ink-soft);
+  font-size: calc(14px * var(--a11y-scale)); font-weight: 400; line-height: 1.6; }
+.tip-in p { max-width: 58ch; }
+.tip-in p + p { margin-block-start: 6px; }
+.tip-cmp dl { display: grid; gap: 10px; }
+.tip-cmp dt { font-weight: 600; color: var(--ink); }
+.tip-cmp dd { margin: 2px 0 0; max-width: 58ch; }
+.tip-cmp dl + p { margin-block-start: 12px; padding-block-start: 12px; border-block-start: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); }
+
+.sim-unit { position: relative; display: block; max-width: 220px; }
+.sim-unit .field { padding-inline-end: 56px; font-variant-numeric: tabular-nums; -moz-appearance: textfield; appearance: textfield; }
+.sim-unit .field::-webkit-inner-spin-button, .sim-unit .field::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.sim-unit i { position: absolute; inset-inline-end: 16px; inset-block-start: 50%; transform: translateY(-50%); font-style: normal; color: var(--muted); pointer-events: none; }
+.sim-step .fm-f { margin-block-end: -6px; }
+
+/* הצבעים בלוגו */
+.sim-pal { display: grid; gap: 2px; }
+.sim-pc { display: flex; align-items: center; gap: 12px; min-height: 48px; }
+.sim-sw { position: relative; display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 50%; cursor: pointer; }
+.sim-sw::before { content: ""; width: 30px; height: 30px; border-radius: 50%; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(255,255,255,.28); }
+.sim-sw input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.sim-sw:focus-within { outline: 2px solid var(--cream); outline-offset: 0; }
+.sim-hex { color: var(--ink-soft); font-size: calc(15px * var(--a11y-scale)); font-variant-numeric: tabular-nums; }
+.sim-pc .switch { margin-inline-start: auto; font-size: calc(15px * var(--a11y-scale)); }
+.sim-pc.is-off .sim-sw, .sim-pc.is-off .sim-hex { opacity: .35; }
+.sim-pal.is-material .sim-sw { cursor: not-allowed; }
+.sim-pal.is-material .sim-sw input { cursor: not-allowed; }
+
+/* סוג השלט: כרטיס עם צילום מעבודה אמיתית */
+.sim-prods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.sim-prod { position: relative; }
+.sim-prod input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.sim-prod span { display: flex; align-items: center; gap: 12px; height: 100%; min-height: 64px; padding: 8px; padding-inline-end: 12px; border-radius: var(--r-2);
+  background: var(--surface); color: var(--ink-soft); font-size: calc(15px * var(--a11y-scale)); line-height: 1.25; transition: background-color .2s var(--ease), color .2s var(--ease); }
+.sim-prod img { width: 48px; height: 48px; flex: none; border-radius: var(--r-1); object-fit: cover; }
+.sim-prod b { font-weight: 500; }
+.sim-prod input:checked + span { background: var(--cream); color: var(--on-cream); }
+.sim-prod input:focus-visible + span { outline: 2px solid var(--cream); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .sim-prod input:not(:checked):hover + span { background: var(--surface-hi); color: var(--ink); } }
+.sim-opts { display: grid; gap: 20px; }
+
+/* סיכום וטופס */
+.sim-sum { display: grid; gap: 14px; padding: 16px; border-radius: var(--r-2); background: var(--surface); }
+.sim-sum img { width: 100%; height: auto; border-radius: var(--r-1); }
+.sim-dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 16px; margin: 0; font-size: calc(15px * var(--a11y-scale)); line-height: 1.45; }
+.sim-dl dt { color: var(--muted); }
+.sim-dl dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+.sim-form { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.sim-form .fm-f > span { color: var(--ink-soft); }
+.sim-fe { font-style: normal; color: #FFC2B6; font-size: calc(14px * var(--a11y-scale)); }
+.sim-form .field[aria-invalid="true"] { border-color: #FF9F8C; }
+.sim-form .btn-block { margin-block-start: 4px; }
+
+.sim-nav { display: flex; gap: 8px; }
+.sim-nav #sim-next { flex: 1; }
+
+/* ===== אחרי הכלי ===== */
+.sim-mq { padding-block: 0 8px; }
+.sim-af-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--col-gap); }
+.sim-af { display: grid; gap: 10px; align-content: start; padding: clamp(24px, 2.4vw, 32px); border-radius: var(--r-2); background: var(--surface); }
+.sim-af .num { font-family: var(--font-d); font-weight: 600; font-size: calc(clamp(30px, 2.6vw, 44px) * var(--a11y-scale)); line-height: 1; color: var(--cream); }
+.sim-af h3 { font-size: var(--fs-h3); font-weight: 500; line-height: 1.25; }
+.sim-af p { color: var(--ink-soft); max-width: 40ch; }
+
+/* ===== מסך בינוני: הפאנל רחב יותר ===== */
+@media (max-width: 1279px) {
+  .sim-view { grid-column: 1 / span 7; }
+  .sim-panel { grid-column: 8 / span 5; }
+}
+
+/* ===== טאבלט וטלפון: ההדמיה למעלה ודביקה, השלבים מתחת ===== */
+@media (max-width: 1023px) {
+  .sim-grid { grid-template-columns: minmax(0, 1fr); row-gap: 20px; }
+  .sim-view, .sim-panel { grid-column: 1; }
+  /* ההדמיה נצמדת לראש המסך, וכשההדר חוזר היא יורדת מתחתיו */
+  .sim-view { top: 0; z-index: 5; margin-inline: calc(var(--gut) * -1); padding: 8px var(--gut) 6px; background: var(--bg); background-image: url(../img/grain.png); background-size: 160px;
+    transition: top .45s var(--ease); /* qa-allow: layout (ההדמיה הדביקה יורדת עם ההדר; transform היה מזיז אותה גם כשהיא לא דביקה) */ }
+  body:has(#hd:not(.is-hidden)) .sim-grid:not([data-step="4"]) .sim-view { top: 76px; }
+  .sim-host { min-height: 0; max-height: 44svh; }
+  .sim-tools { min-height: 40px; gap: 4px 14px; }
+  .sim-h { scroll-margin-top: calc(44svh + 120px); }
+  .sim-panel { gap: 20px; }
+  .sim-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sim-sum { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+  /* בשליחה הטופס צריך את המסך: ההדמיה מפסיקה להידבק */
+  .sim-grid[data-step="4"] .sim-view { position: relative; top: 0; transition: none; }
+  .sim-grid[data-step="4"] .sim-h { scroll-margin-top: 96px; }
+  .sim-nav { position: sticky; bottom: 0; z-index: 4; margin-inline: calc(var(--gut) * -1); padding: 12px var(--gut) calc(12px + env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, rgba(6,26,44,0), var(--bg) 22%); }
+  .sim-af-list { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+}
+
+@media (max-width: 767px) {
+  .sim-ph { padding-block: calc(var(--sec) * .2 + 88px) 24px; }
+  .sim-ph .lead { font-size: calc(16px * var(--a11y-scale)); }
+  .sim-host { max-height: 42svh; }
+  .sim-view > .sim-host, .sim-view > .sim-ang { grid-area: auto; }
+  .sim-ang { justify-self: stretch; margin: 0; background: var(--surface); box-shadow: var(--in-s); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .sim-ang label { flex: 1; }
+  .sim-ang span { justify-content: center; padding: 0 8px; }
+  .sim-h { scroll-margin-top: calc(42svh + 112px); }
+  .sim-st { font-size: calc(12px * var(--a11y-scale)); gap: 4px; }
+  .sim-sum { grid-template-columns: minmax(0, 1fr); }
+  .sim-form { grid-template-columns: minmax(0, 1fr); }
+  .sim-read { font-size: calc(13px * var(--a11y-scale)); }
+}
+
+/* בטלפון צר במיוחד הרמז נשאר אייקון בלבד, כדי שהכפתורים לא יישברו */
+@media (max-width: 358px) { .sim-ang-hint b { display: none; } }
+
+/* במסך רחב ההדמיה עצמה כבר מוצגת לצד הטופס, אז התמונה הממוזערת מיותרת */
+@media (min-width: 1024px) { .sim-sum img { display: none; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .sim-spin { animation-duration: 2.4s; }
+  .sim-view { transition: none; }
+  .sim-real, .sim-q, .sim-q-bar i { transition: none; }
+  .tip-b, .tip-link svg { transition: none; }
+}
