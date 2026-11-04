@@ -163,11 +163,21 @@
       if (n === i && im.dataset.src && !im.getAttribute('src')) im.src = im.dataset.src;
       im.classList.toggle('is-on', n === i);
     });
+    typeRows.forEach(function (row, n) { row.classList.toggle('is-active', n === i); });
   }
   typeRows.forEach(function (row, i) {
     row.addEventListener('pointerenter', function () { showType(i); });
     row.addEventListener('focus', function () { showType(i); });
   });
+  /* the photo follows the row at mid screen, so it changes without a mouse too */
+  if ('IntersectionObserver' in window && window.matchMedia('(min-width:1024px)').matches) {
+    var typeIo = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) showType(Array.prototype.indexOf.call(typeRows, e.target));
+      });
+    }, { rootMargin: '-50% 0px -50% 0px' });
+    typeRows.forEach(function (row) { typeIo.observe(row); });
+  }
 
   /* phone action bar */
   var bar = document.querySelector('[data-bar]');
@@ -346,8 +356,12 @@
     } else {
       scrollOpts = { trigger: proc, start: 'top 70%', end: 'bottom 90%', scrub: 0.4, onUpdate: function (self) { mark_step(self.progress); } };
     }
+    /* on the pinned version the outline starts on the way in, so the scene opens on a shape and not on a stray dash */
+    gsap.to(bLine, {
+      strokeDashoffset: 0, ease: 'none', autoRound: false,
+      scrollTrigger: c.tall ? { trigger: proc, start: 'top 70%', end: 'top -40%', scrub: 0.4 } : { trigger: proc, start: 'top 70%', end: 'top 20%', scrub: 0.4 }
+    });
     gsap.timeline({ defaults: { ease: 'none', autoRound: false }, scrollTrigger: scrollOpts })
-      .to(bLine, { strokeDashoffset: 0, duration: 0.25 }, 0)
       .to(bSketch, { strokeDashoffset: 0, duration: 0.22 }, 0.27)
       .to(bBlue, { opacity: 1, duration: 0.1 }, 0.52)
       .to(bPanel, { opacity: 1, duration: 0.1 }, 0.6)
@@ -360,7 +374,7 @@
       gsap.fromTo(img, { clipPath: 'inset(18% 18% 18% 18%)' }, {
         clipPath: 'inset(0% 0% 0% 0%)',
         ease: 'none',
-        scrollTrigger: { trigger: img.parentNode, start: 'top 92%', end: 'top 42%', scrub: 0.4 }
+        scrollTrigger: { trigger: img.parentNode, start: 'top 96%', end: 'top 66%', scrub: 0.4 }
       });
     });
 
